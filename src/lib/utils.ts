@@ -7,6 +7,7 @@ import { twMerge } from "tailwind-merge"
 import { toast } from "react-toastify"
 
 import { LanguagesList } from "./lists"
+import { ZodError } from "zod"
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -54,4 +55,12 @@ export function extractInfoFromDate(txt: string) {
     year: arr[0],
     month: arr[1]
   }
+}
+
+export function extractErrors(errors: ZodError) {
+  return errors.flatten().fieldErrors
+}
+
+export function extractToken(headers: string) {
+  return headers.split(" ")[1]
 }

@@ -1,324 +1,310 @@
-"use client"
+"use client";
 
-import type React from "react"
-
-import { useState } from "react"
-import Link from "next/link"
-import { ArrowLeft, User, LogOut, Camera, Save, Edit } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import type React from "react";
+import { useState } from "react";
+import Link from "next/link";
+import { ArrowLeft, User, LogOut, Camera, Save, Edit, Shield, Mail, Phone, Calendar, Heart, AlertTriangle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useUser } from "@/hooks/auth/use-user";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { AuthSchema } from "@/schema";
+import { Form } from "@/components/ui/form";
+import { InputField } from "@/components/common/form/input-field";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { updateProfileAction } from "@/actions/auth";
+import { toast } from "react-toastify";
+import { LoadingButton } from "@/components/common/loading-button";
+import { Gender, MaritalStatus } from "@prisma/client";
+import { z } from "zod";
+import { ProtectedRoute } from "@/components/auth/protected-route";
 
 export default function ProfilePage() {
-  const [isEditing, setIsEditing] = useState(false)
-  const [formData, setFormData] = useState({
-    firstName: "John",
-    lastName: "Doe",
-    email: "john.doe@example.com",
-    phone: "+1 (555) 123-4567",
-    dateOfBirth: "1990-05-15",
-    gender: "male",
-    address: "123 Main Street",
-    city: "Anytown",
-    state: "CA",
-    zipCode: "12345",
-    emergencyContact: "Jane Doe",
-    emergencyPhone: "+1 (555) 987-6543",
-    bloodType: "O+",
-    allergies: "Penicillin, Shellfish",
-    medicalConditions: "Hypertension",
-    currentMedications: "Lisinopril 10mg daily",
-    insuranceProvider: "Blue Cross Blue Shield",
-    insuranceId: "BC123456789",
-    primaryDoctor: "Dr. Sarah Johnson",
-    notes: "Prefers morning appointments"
-  })
+  const [isEditing, setIsEditing] = useState(false);
+  const user = useUser();
+  const queryClient = useQueryClient();
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    console.log("Profile updated:", formData)
-    setIsEditing(false)
-    // Handle profile update
-  }
+  const form = useForm({
+    resolver: zodResolver(AuthSchema.updatePatient),
+    defaultValues: {
+      name: user?.name || "",
+      phoneNumber: user?.phoneNumber || "",
+      emergencyContactName: user?.emergencyContactName || "",
+      emergencyContactPhone: user?.emergencyContactPhone || "",
+      allergies: user?.allergies || "",
+      gender: user?.gender || Gender.Male,
+      age: user?.age || 0,
+      birthDate: user?.birthDate ? new Date(user.birthDate) : undefined,
+      maritalStatus: user?.maritalStatus || MaritalStatus.Single,
+    },
+  });
+
+  const mutation = useMutation({
+    mutationFn: (data: z.infer<typeof AuthSchema.updatePatient>) => updateProfileAction(data),
+    onSuccess: () => {
+      toast.success("Profile updated successfully!");
+      queryClient.invalidateQueries({ queryKey: ["user"] });
+      setIsEditing(false);
+    },
+    onError: (error: any) => {
+      toast.error(error?.message || "Failed to update profile");
+    },
+  });
+
+  const handleSubmit = form.handleSubmit((data) => {
+    mutation.mutate(data);
+  });
 
   const handleCancel = () => {
-    setIsEditing(false)
-    // Reset form data if needed
-  }
+    form.reset();
+    setIsEditing(false);
+  };
 
   return (
-    <div className='min-h-screen bg-gray-50'>
-      <div className='max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8'>
-        {/* Breadcrumb */}
-        <div className='flex items-center gap-2 mb-6'>
-          <Link href='/dashboard' className='flex items-center gap-2 text-blue-600 hover:text-blue-700'>
-            <ArrowLeft className='h-4 w-4' />
-            Back to Dashboard
-          </Link>
-        </div>
-
-        {/* Page Header */}
-        <div className='mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4'>
-          <div>
-            <h1 className='text-3xl font-bold text-gray-900'>Patient Profile</h1>
-            <p className='text-gray-600 mt-2'>Manage your personal and medical information</p>
+    <ProtectedRoute>
+      <div className="min-h-screen bg-gray-50">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          {/* Breadcrumb */}
+          <div className="flex items-center gap-2 mb-6">
+            <Link
+              href="/dashboard"
+              className="flex items-center gap-2 text-blue-600 hover:text-blue-700"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to Dashboard
+            </Link>
           </div>
-          <div className='flex gap-2'>
-            {isEditing ? (
-              <>
-                <Button variant='outline' onClick={handleCancel}>
-                  Cancel
-                </Button>
-                <Button onClick={handleSubmit}>
-                  <Save className='h-4 w-4 mr-2' />
-                  Save Changes
-                </Button>
-              </>
-            ) : (
-              <Button onClick={() => setIsEditing(true)}>
-                <Edit className='h-4 w-4 mr-2' />
-                Edit Profile
-              </Button>
-            )}
+
+          {/* Page Header */}
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Profile Settings</h1>
+            <p className="text-gray-600">Manage your personal information and preferences</p>
           </div>
-        </div>
 
-        <form onSubmit={handleSubmit}>
-          <Tabs defaultValue='personal' className='space-y-6'>
-            <TabsList className='grid w-full grid-cols-3'>
-              <TabsTrigger value='personal'>Personal Info</TabsTrigger>
-              <TabsTrigger value='medical'>Medical Info</TabsTrigger>
-              <TabsTrigger value='insurance'>Insurance</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value='personal' className='space-y-6'>
-              {/* Profile Picture */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Profile Overview */}
+            <div className="lg:col-span-1">
               <Card>
-                <CardHeader>
-                  <CardTitle>Profile Picture</CardTitle>
-                  <CardDescription>Update your profile photo</CardDescription>
+                <CardHeader className="text-center">
+                  <div className="mx-auto mb-4">
+                    <Avatar className="h-24 w-24">
+                      <AvatarImage src={user?.image || ""} />
+                      <AvatarFallback className="text-2xl">{user?.name?.charAt(0).toUpperCase()}</AvatarFallback>
+                    </Avatar>
+                  </div>
+                  <CardTitle className="text-xl">{user?.name}</CardTitle>
+                  <CardDescription>{user?.email}</CardDescription>
                 </CardHeader>
-                <CardContent className='flex items-center gap-6'>
-                  <Avatar className='h-24 w-24'>
-                    <AvatarImage src='/placeholder.jpg?height=96&width=96' />
-                    <AvatarFallback className='text-2xl'>
-                      {formData.firstName[0]}
-                      {formData.lastName[0]}
-                    </AvatarFallback>
-                  </Avatar>
-                  {isEditing && (
-                    <Button variant='outline' className='flex items-center gap-2 bg-transparent'>
-                      <Camera className='h-4 w-4' />
-                      Change Photo
-                    </Button>
-                  )}
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <Phone className="h-4 w-4" />
+                      <span>{user?.phoneNumber}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <Calendar className="h-4 w-4" />
+                      <span>Age: {user?.age}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <Heart className="h-4 w-4" />
+                      <span>Gender: {user?.gender}</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    {!isEditing && (
+                      <Button
+                        onClick={() => setIsEditing(true)}
+                        className="w-full"
+                        variant="outline"
+                      >
+                        <Edit className="h-4 w-4 mr-2" />
+                        Edit Profile
+                      </Button>
+                    )}
+
+                    <Link href="/auth/reset-password">
+                      <Button
+                        variant="ghost"
+                        className="w-full text-blue-600 hover:text-blue-700"
+                      >
+                        <Shield className="h-4 w-4 mr-2" />
+                        Change Password
+                      </Button>
+                    </Link>
+                  </div>
                 </CardContent>
               </Card>
+            </div>
 
-              {/* Personal Information */}
+            {/* Profile Form */}
+            <div className="lg:col-span-2">
               <Card>
                 <CardHeader>
                   <CardTitle>Personal Information</CardTitle>
-                  <CardDescription>Your basic personal details</CardDescription>
-                </CardHeader>
-                <CardContent className='space-y-4'>
-                  <div className='grid gap-4 md:grid-cols-2'>
-                    <div className='space-y-2'>
-                      <Label htmlFor='firstName'>First Name</Label>
-                      <Input id='firstName' value={formData.firstName} onChange={(e) => setFormData({ ...formData, firstName: e.target.value })} disabled={!isEditing} required />
-                    </div>
-                    <div className='space-y-2'>
-                      <Label htmlFor='lastName'>Last Name</Label>
-                      <Input id='lastName' value={formData.lastName} onChange={(e) => setFormData({ ...formData, lastName: e.target.value })} disabled={!isEditing} required />
-                    </div>
-                  </div>
-
-                  <div className='grid gap-4 md:grid-cols-2'>
-                    <div className='space-y-2'>
-                      <Label htmlFor='email'>Email</Label>
-                      <Input id='email' type='email' value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} disabled={!isEditing} required />
-                    </div>
-                    <div className='space-y-2'>
-                      <Label htmlFor='phone'>Phone Number</Label>
-                      <Input id='phone' type='tel' value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} disabled={!isEditing} />
-                    </div>
-                  </div>
-
-                  <div className='grid gap-4 md:grid-cols-2'>
-                    <div className='space-y-2'>
-                      <Label htmlFor='dateOfBirth'>Date of Birth</Label>
-                      <Input id='dateOfBirth' type='date' value={formData.dateOfBirth} onChange={(e) => setFormData({ ...formData, dateOfBirth: e.target.value })} disabled={!isEditing} required />
-                    </div>
-                    <div className='space-y-2'>
-                      <Label htmlFor='gender'>Gender</Label>
-                      <Select value={formData.gender} onValueChange={(value) => setFormData({ ...formData, gender: value })} disabled={!isEditing}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value='male'>Male</SelectItem>
-                          <SelectItem value='female'>Female</SelectItem>
-                          <SelectItem value='other'>Other</SelectItem>
-                          <SelectItem value='prefer-not-to-say'>Prefer not to say</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Address Information */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Address Information</CardTitle>
-                  <CardDescription>Your residential address</CardDescription>
-                </CardHeader>
-                <CardContent className='space-y-4'>
-                  <div className='space-y-2'>
-                    <Label htmlFor='address'>Street Address</Label>
-                    <Input id='address' value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} disabled={!isEditing} />
-                  </div>
-
-                  <div className='grid gap-4 md:grid-cols-3'>
-                    <div className='space-y-2'>
-                      <Label htmlFor='city'>City</Label>
-                      <Input id='city' value={formData.city} onChange={(e) => setFormData({ ...formData, city: e.target.value })} disabled={!isEditing} />
-                    </div>
-                    <div className='space-y-2'>
-                      <Label htmlFor='state'>State</Label>
-                      <Input id='state' value={formData.state} onChange={(e) => setFormData({ ...formData, state: e.target.value })} disabled={!isEditing} />
-                    </div>
-                    <div className='space-y-2'>
-                      <Label htmlFor='zipCode'>ZIP Code</Label>
-                      <Input id='zipCode' value={formData.zipCode} onChange={(e) => setFormData({ ...formData, zipCode: e.target.value })} disabled={!isEditing} />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Emergency Contact */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Emergency Contact</CardTitle>
-                  <CardDescription>Person to contact in case of emergency</CardDescription>
-                </CardHeader>
-                <CardContent className='space-y-4'>
-                  <div className='grid gap-4 md:grid-cols-2'>
-                    <div className='space-y-2'>
-                      <Label htmlFor='emergencyContact'>Contact Name</Label>
-                      <Input id='emergencyContact' value={formData.emergencyContact} onChange={(e) => setFormData({ ...formData, emergencyContact: e.target.value })} disabled={!isEditing} />
-                    </div>
-                    <div className='space-y-2'>
-                      <Label htmlFor='emergencyPhone'>Contact Phone</Label>
-                      <Input id='emergencyPhone' type='tel' value={formData.emergencyPhone} onChange={(e) => setFormData({ ...formData, emergencyPhone: e.target.value })} disabled={!isEditing} />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value='medical' className='space-y-6'>
-              {/* Medical Information */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Medical Information</CardTitle>
-                  <CardDescription>Your medical history and current health status</CardDescription>
-                </CardHeader>
-                <CardContent className='space-y-4'>
-                  <div className='space-y-2'>
-                    <Label htmlFor='bloodType'>Blood Type</Label>
-                    <Select value={formData.bloodType} onValueChange={(value) => setFormData({ ...formData, bloodType: value })} disabled={!isEditing}>
-                      <SelectTrigger>
-                        <SelectValue placeholder='Select blood type' />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value='A+'>A+</SelectItem>
-                        <SelectItem value='A-'>A-</SelectItem>
-                        <SelectItem value='B+'>B+</SelectItem>
-                        <SelectItem value='B-'>B-</SelectItem>
-                        <SelectItem value='AB+'>AB+</SelectItem>
-                        <SelectItem value='AB-'>AB-</SelectItem>
-                        <SelectItem value='O+'>O+</SelectItem>
-                        <SelectItem value='O-'>O-</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className='space-y-2'>
-                    <Label htmlFor='allergies'>Allergies</Label>
-                    <Textarea id='allergies' value={formData.allergies} onChange={(e) => setFormData({ ...formData, allergies: e.target.value })} disabled={!isEditing} placeholder='List any known allergies' className='min-h-[80px]' />
-                  </div>
-
-                  <div className='space-y-2'>
-                    <Label htmlFor='medicalConditions'>Medical Conditions</Label>
-                    <Textarea id='medicalConditions' value={formData.medicalConditions} onChange={(e) => setFormData({ ...formData, medicalConditions: e.target.value })} disabled={!isEditing} placeholder='List any chronic conditions or ongoing health issues' className='min-h-[80px]' />
-                  </div>
-
-                  <div className='space-y-2'>
-                    <Label htmlFor='currentMedications'>Current Medications</Label>
-                    <Textarea id='currentMedications' value={formData.currentMedications} onChange={(e) => setFormData({ ...formData, currentMedications: e.target.value })} disabled={!isEditing} placeholder='List all current medications with dosages' className='min-h-[80px]' />
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Techmedvider */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Techmedvider</CardTitle>
-                  <CardDescription>Your primary healthcare information</CardDescription>
-                </CardHeader>
-                <CardContent className='space-y-4'>
-                  <div className='space-y-2'>
-                    <Label htmlFor='primaryDoctor'>Primary Doctor</Label>
-                    <Input id='primaryDoctor' value={formData.primaryDoctor} onChange={(e) => setFormData({ ...formData, primaryDoctor: e.target.value })} disabled={!isEditing} placeholder='Dr. Name' />
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value='insurance' className='space-y-6'>
-              {/* Insurance Information */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Insurance Information</CardTitle>
-                  <CardDescription>Your health insurance details</CardDescription>
-                </CardHeader>
-                <CardContent className='space-y-4'>
-                  <div className='grid gap-4 md:grid-cols-2'>
-                    <div className='space-y-2'>
-                      <Label htmlFor='insuranceProvider'>Insurance Provider</Label>
-                      <Input id='insuranceProvider' value={formData.insuranceProvider} onChange={(e) => setFormData({ ...formData, insuranceProvider: e.target.value })} disabled={!isEditing} placeholder='Insurance company name' />
-                    </div>
-                    <div className='space-y-2'>
-                      <Label htmlFor='insuranceId'>Insurance ID</Label>
-                      <Input id='insuranceId' value={formData.insuranceId} onChange={(e) => setFormData({ ...formData, insuranceId: e.target.value })} disabled={!isEditing} placeholder='Policy or member ID' />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Additional Notes */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Additional Notes</CardTitle>
-                  <CardDescription>Any additional information for Techmedviders</CardDescription>
+                  <CardDescription>Update your personal details and medical information</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className='space-y-2'>
-                    <Label htmlFor='notes'>Notes</Label>
-                    <Textarea id='notes' value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} disabled={!isEditing} placeholder='Any special instructions or preferences' className='min-h-[100px]' />
-                  </div>
+                  <Form {...form}>
+                    <form
+                      onSubmit={handleSubmit}
+                      className="space-y-6"
+                    >
+                      {/* Basic Information */}
+                      <div className="space-y-4">
+                        <h3 className="text-lg font-semibold flex items-center gap-2">
+                          <User className="h-5 w-5" />
+                          Basic Information
+                        </h3>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <InputField
+                            control={form.control}
+                            name="name"
+                            label="Full Name"
+                            placeholder="John Doe"
+                            disabled={!isEditing}
+                          />
+                          <InputField
+                            control={form.control}
+                            name="phoneNumber"
+                            label="Phone Number"
+                            placeholder="+1234567890"
+                            disabled={!isEditing}
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <InputField
+                            control={form.control}
+                            name="age"
+                            label="Age"
+                            type="number"
+                            placeholder="25"
+                            disabled={!isEditing}
+                            valueAsNumber
+                          />
+                          <div className="space-y-2">
+                            <Label>Gender</Label>
+                            <Select
+                              onValueChange={(value) => form.setValue("gender", value as Gender)}
+                              disabled={!isEditing}
+                              value={form.watch("gender")}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select gender" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value={Gender.Male}>Male</SelectItem>
+                                <SelectItem value={Gender.Female}>Female</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <InputField
+                            control={form.control}
+                            name="birthDate"
+                            label="Birth Date"
+                            type="date"
+                            disabled={!isEditing}
+                          />
+                          <div className="space-y-2">
+                            <Label>Marital Status</Label>
+                            <Select
+                              onValueChange={(value) => form.setValue("maritalStatus", value as MaritalStatus)}
+                              disabled={!isEditing}
+                              value={form.watch("maritalStatus")}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select marital status" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value={MaritalStatus.Single}>Single</SelectItem>
+                                <SelectItem value={MaritalStatus.Married}>Married</SelectItem>
+                                <SelectItem value={MaritalStatus.Divorced}>Divorced</SelectItem>
+                                <SelectItem value={MaritalStatus.Widowed}>Widowed</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Emergency Contact */}
+                      <div className="space-y-4">
+                        <h3 className="text-lg font-semibold flex items-center gap-2">
+                          <AlertTriangle className="h-5 w-5" />
+                          Emergency Contact
+                        </h3>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <InputField
+                            control={form.control}
+                            name="emergencyContactName"
+                            label="Emergency Contact Name"
+                            placeholder="Jane Doe"
+                            disabled={!isEditing}
+                          />
+                          <InputField
+                            control={form.control}
+                            name="emergencyContactPhone"
+                            label="Emergency Contact Phone"
+                            placeholder="+1234567890"
+                            disabled={!isEditing}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Medical Information */}
+                      <div className="space-y-4">
+                        <h3 className="text-lg font-semibold flex items-center gap-2">
+                          <Heart className="h-5 w-5" />
+                          Medical Information
+                        </h3>
+
+                        <InputField
+                          control={form.control}
+                          name="allergies"
+                          label="Allergies"
+                          placeholder="List any allergies..."
+                          isTextarea={true}
+                          disabled={!isEditing}
+                        />
+                      </div>
+
+                      {/* Action Buttons */}
+                      {isEditing && (
+                        <div className="flex gap-3 pt-4">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={handleCancel}
+                            disabled={mutation.isPending}
+                          >
+                            Cancel
+                          </Button>
+                          <LoadingButton
+                            type="submit"
+                            loading={mutation.isPending}
+                          >
+                            <Save className="h-4 w-4 mr-2" />
+                            Save Changes
+                          </LoadingButton>
+                        </div>
+                      )}
+                    </form>
+                  </Form>
                 </CardContent>
               </Card>
-            </TabsContent>
-          </Tabs>
-        </form>
+            </div>
+          </div>
+        </div>
       </div>
-    </div>
-  )
+    </ProtectedRoute>
+  );
 }

@@ -1,19 +1,21 @@
+"use server"
+
 import axios from "axios"
 
-import { API_URL, AUTH_COOKIE } from "./constants"
+import { API_URL, AUTH_COOKIE, invalidToken } from "./constants"
 
 import { loadDefaultHeaders } from "./api"
 import { ApiError, ApiResponse, TObject } from "@/types/default"
 
 import { cookies } from "next/headers"
 
-const api = axios.create({
+export const api = axios.create({
   baseURL: API_URL
 })
 
 api.interceptors.request.use(async (config) => {
   const cookieStore = await cookies()
-  const token = cookieStore.get(AUTH_COOKIE)?.value || ""
+  const token = cookieStore.get(AUTH_COOKIE)?.value
 
   config.headers = {
     ...loadDefaultHeaders(token),
